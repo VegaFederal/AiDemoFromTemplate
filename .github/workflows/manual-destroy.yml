@@ -1,0 +1,89 @@
+name: Manual Infrastructure Destroy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to destroy (dev/prod)'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
+      confirmation:
+        description: 'Type "DESTROY" to confirm destruction of resources'
+        required: true
+        type: string
+
+jobs:
+  validate-confirmation:
+    name: Validate Confirmation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation input
+        if: ${{ github.event.inputs.confirmation != 'DESTROY' }}
+        run: |
+          echo "Error: You must type 'DESTROY' exactly to confirm resource destruction"
+          exit 1
+
+  destroy-infrastructure:
+    name: Destroy Infrastructure
+    needs: validate-confirmation
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+    
+    - name: Destroy Infrastructure
+      run: |
+        ENV=${{ github.event.inputs.environment }}
+        echo "Starting destruction of $ENV environment infrastructure..."
+        
+        # Detect deployment type and run appropriate destroy command
+        if [ -f serverless.yml ]; then
+          echo "Destroying with Serverless Framework"
+          npm install -g serverless
+          serverless remove --stage $ENV
+        
+        elif [ -d infrastructure/cdk ]; then
+          echo "Destroying with AWS CDK"
+          cd infrastructure/cdk
+          npm ci
+          npm run build
+          npm run cdk destroy -- --force --all
+        
+        elif [ -f infrastructure/cloudformation/template.yaml ]; then
+          echo "Destroying with CloudFormation"
+          STACK_NAME=${GITHUB_REPOSITORY#*/}-$ENV
+          aws cloudformation delete-stack --stack-name $STACK_NAME
+          echo "Initiated deletion of stack $STACK_NAME"
+          aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME
+          echo "Stack $STACK_NAME deleted successfully"
+        
+        elif [ -d infrastructure/terraform ]; then
+          echo "Destroying with Terraform"
+          cd infrastructure/terraform
+          terraform init
+          terraform destroy -auto-approve -var="environment=$ENV"
+        
+        else
+          echo "No recognized infrastructure code found"
+          exit 1
+        fi
+        
+        echo "Infrastructure destruction completed for $ENV environment"

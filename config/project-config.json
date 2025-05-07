@@ -4,8 +4,8 @@
   "infraType": "cloudformation",
   "applicationType": "serverless",
   "awsRegion": "us-east-1",
-  "vpcId": "vpc-0956ba067263f706b",
-  "subnetIds": "subnet-00f677a7f7cdea980",
+  "vpcId": "vpc-05beac377794a8bd0",
+  "subnetIds": "subnet-077c4af68ae8a1869",
   "githubRepo": "https://github.com/VegaFederal/AiDemoFromTemplate.git",
   "createdAt": "2025-05-06T20:07:31Z"
 }

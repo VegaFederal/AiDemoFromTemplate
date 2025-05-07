@@ -10,7 +10,10 @@ Parameters:
       - test
       - prod
     Description: The deployment environment
-  
+
+  ###################################
+  ## VPC stuff
+  ###################################
   VpcId:
     Type: AWS::EC2::VPC::Id
     Default: vpc-0956ba067263f706b
@@ -20,9 +23,270 @@ Parameters:
     Type: List<AWS::EC2::Subnet::Id>
     Default: subnet-00f677a7f7cdea980
     Description: List of existing subnet IDs for deployment
-
+      
 Resources:
-  # Your resources will go here
+  ####################################
+  ##  Web Site Stuff
+  ####################################
+  # S3 Bucket for all static website files Creation.
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-website-bucket
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Bucket Policy for CloudFront access
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucket
+      PolicyDocument:
+        Statement:
+          - Action:
+              - s3:GetObject
+            Effect: Allow
+            Resource: !Sub ${WebsiteBucket.Arn}/*
+            Principal:
+              CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+
+  ####################################
+  ## Lambda Set up and API Gateway
+  ####################################
+
+  # Lambda Function for the API
+  AIFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Ref WebsiteBucket
+        S3Key: lambda/lambdaAiHandler.zip  # Changed from .py to .zip
+      Description: AI Lambda handler for request response.
+      FunctionName: !Sub ${AWS::StackName}-AIHandler
+      Handler: lambdaAiHandler.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt LambdaRole.Arn
+      Runtime: python3.9
+      Timeout: 300
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroup
+        SubnetIds: !Ref SubnetIds
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-lambda
+        - Key: Environment
+          Value: !Ref Environment
+
+
+  # IAM Role for the Lambda Function
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+        - PolicyName: LambdaVPCPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:CreateNetworkInterface
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DeleteNetworkInterface
+                  - ec2:AssignPrivateIpAddresses
+                  - ec2:UnassignPrivateIpAddresses
+                Resource: '*'
+
+        - PolicyName: LambdaBedrockPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModelWithResponseStream
+                  - bedrock:InvokeModel
+                Resource: 
+                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.nova-pro-v1:0"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}::879961718230:inference-profile/us.amazon.nova-pro-v1:0"
+
+      RoleName: !Sub ${AWS::StackName}-lambda-role
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-lambda-role
+        - Key: Environment
+          Value: !Ref Environment
+
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Lambda function
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-lambda-sg
+        - Key: Environment
+          Value: !Ref Environment
+
+  #########################################
+  ## API Gateway connection to lambda
+  #########################################
+  # API Gateway Resource (endpoint path)
+  ApiResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref Api
+      ParentId: !GetAtt Api.RootResourceId
+      PathPart: 'ai'
+    
+  # API Gateway Method (HTTP method)
+  ApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref Api
+      ResourceId: !Ref ApiResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AIFunction.Arn}/invocations
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: 'Empty'
+
+  # API Gateway Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: ApiMethod
+    Properties:
+      RestApiId: !Ref Api
+      StageName: !Ref Environment
+      
+  # Lambda Permission for API Gateway
+  LambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref AIFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/${Environment}/POST/ai
+
+  # API Gateway REST API
+  Api:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub ${AWS::StackName}-ai-api
+      Description: API Gateway for AI Lambda function.
+
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-ai-api
+        - Key: Environment
+          Value: !Ref Environment
+
+  # CloudFront Distribution
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Origins:
+          - DomainName: !GetAtt WebsiteBucket.RegionalDomainName
+            Id: S3Origin
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}
+          - DomainName: !Sub "${Api}.execute-api.${AWS::Region}.amazonaws.com"
+            Id: ApiGateway
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+        Enabled: true
+        DefaultRootObject: index.html
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          TargetOriginId: S3Origin
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+        CacheBehaviors:
+          - PathPattern: '/ai*'
+            AllowedMethods:
+              - HEAD
+              - DELETE
+              - POST
+              - GET
+              - OPTIONS
+              - PUT
+              - PATCH
+            TargetOriginId: ApiGateway
+            ForwardedValues:
+              QueryString: true
+              Headers:
+                - 'Authorization'
+                - 'Content-Type'
+              Cookies:
+                Forward: none
+            ViewerProtocolPolicy: https-only
+        PriceClass: PriceClass_100
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub ${AWS::StackName} OAI
 
 Outputs:
-  # Your outputs will go here
+  ApiEndpoint:
+    Description: "API Gateway endpoint URL for the AI function"
+    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/ai"
+  WebsiteUrl:
+    Description: "CloudFront distribution URL for the website"
+    Value: !GetAtt CloudFrontDistribution.DomainName

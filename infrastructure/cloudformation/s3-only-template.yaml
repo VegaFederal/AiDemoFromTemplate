@@ -1,0 +1,45 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: S3 bucket for AI Demo
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - test
+      - prod
+    Description: The deployment environment
+  
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Default: vpc-0956ba067263f706b
+    Description: ID of the existing company VPC
+  
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Default: subnet-00f677a7f7cdea980
+    Description: List of existing subnet IDs for deployment
+
+Resources:
+  # S3 Bucket for all static website files Creation.
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-website-bucket
+        - Key: Environment
+          Value: !Ref Environment
+
+Outputs:
+  WebsiteBucketName:
+    Description: "Name of the S3 bucket for website files"
+    Value: !Ref WebsiteBucket
