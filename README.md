@@ -1,6 +1,6 @@
-# AWS Project Template
+# AiDemo
 
-A comprehensive template repository to help developers quickly start new AWS projects with best practices built-in.
+This is a copy of the AiDemo using the template for creation.
 
 ## Features
 
@@ -37,11 +37,3 @@ See the `/docs` directory for detailed documentation on:
 - Security guidelines
 - Cost optimization
 - Troubleshooting
-
-## Contributing
-
-Contributions to improve this template are welcome! Please see CONTRIBUTING.md for details.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
