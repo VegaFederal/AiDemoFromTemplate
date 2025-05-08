@@ -81,13 +81,35 @@ jobs:
       # Upload website files to S3 bucket
       - name: Upload website files to S3
         run: |
-          if [ -d "website" ]; then
-            aws s3 sync website/ s3://$BUCKET_NAME/
+          echo "Checking for website directory at src/website..."
+          if [ -d "src/website" ]; then
+            echo "Website directory found. Contents:"
+            ls -la src/website/
+            
+            echo "Uploading to S3 bucket: $BUCKET_NAME"
+            aws s3 sync src/website/ s3://$BUCKET_NAME/ --debug
+            
+            echo "Verifying upload..."
+            aws s3 ls s3://$BUCKET_NAME/ --recursive
           else
-            echo "No website directory found. Creating a simple index.html"
-            mkdir -p website
-            echo "<html><body><h1>AI Demo</h1><p>Welcome to the AI Demo!</p></body></html>" > website/index.html
-            aws s3 sync website/ s3://$BUCKET_NAME/
+            echo "No website directory found at src/website. Checking for website directory at root..."
+            if [ -d "website" ]; then
+              echo "Website directory found at root. Contents:"
+              ls -la website/
+              
+              echo "Uploading to S3 bucket: $BUCKET_NAME"
+              aws s3 sync website/ s3://$BUCKET_NAME/ --debug
+            else
+              echo "No website directory found. Creating a simple index.html"
+              mkdir -p website
+              echo "<html><body><h1>AI Demo</h1><p>Welcome to the AI Demo!</p></body></html>" > website/index.html
+              
+              echo "Uploading to S3 bucket: $BUCKET_NAME"
+              aws s3 sync website/ s3://$BUCKET_NAME/ --debug
+            fi
+            
+            echo "Verifying upload..."
+            aws s3 ls s3://$BUCKET_NAME/ --recursive
           fi
       
       # Get CloudFront URL
