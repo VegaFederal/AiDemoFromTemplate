@@ -47,7 +47,7 @@ Resources:
         - Key: Project
           Value: !Ref ProjectName
 
-  # Bucket policy for CloudFront access
+  # Bucket policy for CloudFront access using OAI
   WebsiteBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
@@ -57,12 +57,16 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: cloudfront.amazonaws.com
+              AWS: !Sub "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOAI}"
             Action: 's3:GetObject'
             Resource: !Sub "${WebsiteBucket.Arn}/*"
-            Condition:
-              StringEquals:
-                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/*"
+
+  # CloudFront Origin Identity (OAI)
+  CloudFrontOAI:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub "${ProjectName}-${Environment}-OAI"
 
 Outputs:
   WebsiteBucketName:
@@ -76,3 +80,9 @@ Outputs:
     Value: !GetAtt WebsiteBucket.Arn
     Export:
       Name: !Sub "${ProjectName}-${Environment}-WebsiteBucketArn"
+    
+  CloudFrontOAI:
+    Description: "CloudFront Origin Access Identity"
+    Value: !Ref CloudFrontOAI
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-CloudFrontOAI"
