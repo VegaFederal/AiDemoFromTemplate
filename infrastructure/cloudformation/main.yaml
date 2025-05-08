@@ -2,6 +2,11 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: Main stack for AI Demo
 
 Parameters:
+  ProjectName:
+    Type: String
+    Default: AiDemo
+    Description: Name of the project
+    
   Environment:
     Type: String
     Default: dev
@@ -13,33 +18,44 @@ Parameters:
   
   VpcId:
     Type: AWS::EC2::VPC::Id
-    Default: vpc-0956ba067263f706b
     Description: ID of the existing company VPC
   
   SubnetIds:
     Type: List<AWS::EC2::Subnet::Id>
-    Default: subnet-00f677a7f7cdea980
     Description: List of existing subnet IDs for deployment
+    
+  TemplateBucket:
+    Type: String
+    Description: S3 bucket containing nested stack templates
+    
+  AiModelId:
+    Type: String
+    Default: amazon.nova-pro-v1:0
+    Description: Amazon Bedrock model ID to use
+
 
 Resources:
   StorageStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://your-s3-bucket.s3.amazonaws.com/templates/storage.yaml
+      TemplateURL: !Sub https://${TemplateBucket}.s3.amazonaws.com/templates/storage.yaml
       Parameters:
         Environment: !Ref Environment
+        ProjectName: !Ref ProjectName
       TimeoutInMinutes: 30
 
   ComputeStack:
     Type: AWS::CloudFormation::Stack
     DependsOn: StorageStack
     Properties:
-      TemplateURL: https://your-s3-bucket.s3.amazonaws.com/templates/compute.yaml
+      TemplateURL: !Sub https://${TemplateBucket}.s3.amazonaws.com/templates/compute.yaml
       Parameters:
         Environment: !Ref Environment
+        ProjectName: !Ref ProjectName
         VpcId: !Ref VpcId
         SubnetIds: !Join [",", !Ref SubnetIds]
         WebsiteBucketName: !GetAtt StorageStack.Outputs.WebsiteBucketName
+        AiModelId: !Ref AiModelId
       TimeoutInMinutes: 30
 
   ApiStack:
