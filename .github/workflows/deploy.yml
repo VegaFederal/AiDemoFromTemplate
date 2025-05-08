@@ -49,12 +49,15 @@ jobs:
       
       - name: Create template bucket
         run: |
-          TIMESTAMP=$(date +%s)
-          TEMPLATE_BUCKET="${PROJECT_NAME}-templates-${TIMESTAMP}"
-          echo "TEMPLATE_BUCKET=$TEMPLATE_BUCKET" >> $GITHUB_ENV
-          
-          aws s3 mb s3://$TEMPLATE_BUCKET
-      
+            TIMESTAMP=$(date +%s)
+            # Convert project name to lowercase and replace invalid characters
+            PROJECT_NAME_LOWER=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]')
+            TEMPLATE_BUCKET="${PROJECT_NAME_LOWER}-templates-${TIMESTAMP}"
+            echo "TEMPLATE_BUCKET=$TEMPLATE_BUCKET" >> $GITHUB_ENV
+            
+            echo "Creating bucket: $TEMPLATE_BUCKET"
+            aws s3 mb s3://$TEMPLATE_BUCKET
+        
       - name: Upload templates to S3
         run: aws s3 sync infrastructure/cloudformation/templates/ s3://$TEMPLATE_BUCKET/templates/
       
