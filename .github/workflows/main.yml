@@ -11,8 +11,7 @@ env:
   SUBNET_IDS: subnet-077c4af68ae8a1869  # Updated from project-config.json
   AWS_REGION: us-east-1
   STACK_NAME: AiDemo
-  TEMPLATE_BUCKET: your-template-bucket-name  # Replace with your bucket name
-
+  TEMPLATE_BUCKET: cdk-hnb659fds-assets-879961718230-us-east-1 
 jobs:
   test:
     runs-on: ubuntu-latest
