@@ -2,6 +2,11 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: API resources for AI Demo
 
 Parameters:
+  ProjectName:
+    Type: String
+    Default: AiDemo
+    Description: Name of the project
+
   Environment:
     Type: String
     Default: dev
@@ -20,16 +25,18 @@ Resources:
   Api:
     Type: AWS::ApiGateway::RestApi
     Properties:
-      Name: !Sub ${AWS::StackName}-ai-api
+      Name: !Sub "${ProjectName}-${Environment}-ai-api"
       Description: API Gateway for AI Lambda function.
       EndpointConfiguration:
         Types:
           - REGIONAL
       Tags:
         - Key: Name
-          Value: !Sub ${AWS::StackName}-ai-api
+          Value: !Sub "${ProjectName}-${Environment}-ai-api"
         - Key: Environment
           Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
   # API Gateway Resource (endpoint path)
   ApiResource:
@@ -56,10 +63,42 @@ Resources:
           ResponseModels:
             application/json: 'Empty'
 
+  # OPTIONS method for CORS support
+  ApiOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref Api
+      ResourceId: !Ref ApiResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,POST'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: '{}'
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: 'Empty'
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
   # API Gateway Deployment
   ApiDeployment:
     Type: AWS::ApiGateway::Deployment
-    DependsOn: ApiMethod
+    DependsOn: 
+      - ApiMethod
+      - ApiOptionsMethod
     Properties:
       RestApiId: !Ref Api
       StageName: !Ref Environment
@@ -78,10 +117,10 @@ Outputs:
     Description: "API Gateway endpoint URL for the AI function"
     Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/ai"
     Export:
-      Name: !Sub "${AWS::StackName}-ApiEndpoint"
+      Name: !Sub "${ProjectName}-${Environment}-ApiEndpoint"
   
   ApiId:
     Description: "ID of the API Gateway REST API"
     Value: !Ref Api
     Export:
-      Name: !Sub "${AWS::StackName}-ApiId"
+      Name: !Sub "${ProjectName}-${Environment}-ApiId"

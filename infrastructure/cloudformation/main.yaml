@@ -21,8 +21,8 @@ Parameters:
     Description: ID of the existing company VPC
   
   SubnetIds:
-    Type: List<AWS::EC2::Subnet::Id>
-    Description: List of existing subnet IDs for deployment
+    Type: CommaDelimitedList
+    Description: Comma-delimited list of existing subnet IDs for deployment
     
   TemplateBucket:
     Type: String
@@ -33,12 +33,11 @@ Parameters:
     Default: amazon.nova-pro-v1:0
     Description: Amazon Bedrock model ID to use
 
-
 Resources:
   StorageStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub https://${TemplateBucket}.s3.amazonaws.com/templates/storage.yaml
+      TemplateURL: !Sub https://${TemplateBucket}.s3.${AWS::Region}.amazonaws.com/templates/storage.yaml
       Parameters:
         Environment: !Ref Environment
         ProjectName: !Ref ProjectName
@@ -48,23 +47,24 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DependsOn: StorageStack
     Properties:
-      TemplateURL: !Sub https://${TemplateBucket}.s3.amazonaws.com/templates/compute.yaml
+      TemplateURL: !Sub https://${TemplateBucket}.s3.${AWS::Region}.amazonaws.com/templates/compute.yaml
       Parameters:
         Environment: !Ref Environment
         ProjectName: !Ref ProjectName
         VpcId: !Ref VpcId
         SubnetIds: !Join [",", !Ref SubnetIds]
         WebsiteBucketName: !GetAtt StorageStack.Outputs.WebsiteBucketName
-        AiModelId: !Ref AiModelId
+        ModelId: !Ref AiModelId
       TimeoutInMinutes: 30
 
   ApiStack:
     Type: AWS::CloudFormation::Stack
     DependsOn: ComputeStack
     Properties:
-      TemplateURL: !Sub https://${TemplateBucket}.s3.amazonaws.com/templates/api.yaml
+      TemplateURL: !Sub https://${TemplateBucket}.s3.${AWS::Region}.amazonaws.com/templates/api.yaml
       Parameters:
         Environment: !Ref Environment
+        ProjectName: !Ref ProjectName
         LambdaFunctionArn: !GetAtt ComputeStack.Outputs.LambdaFunctionArn
       TimeoutInMinutes: 30
 
@@ -72,9 +72,10 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DependsOn: [StorageStack, ApiStack]
     Properties:
-      TemplateURL: !Sub https://${TemplateBucket}.s3.amazonaws.com/templates/cdn.yaml
+      TemplateURL: !Sub https://${TemplateBucket}.s3.${AWS::Region}.amazonaws.com/templates/cdn.yaml
       Parameters:
         Environment: !Ref Environment
+        ProjectName: !Ref ProjectName
         WebsiteBucketName: !GetAtt StorageStack.Outputs.WebsiteBucketName
         ApiEndpoint: !GetAtt ApiStack.Outputs.ApiEndpoint
       TimeoutInMinutes: 30

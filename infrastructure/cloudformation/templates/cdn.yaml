@@ -2,6 +2,11 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: CDN resources for AI Demo
 
 Parameters:
+  ProjectName:
+    Type: String
+    Default: AiDemo
+    Description: Name of the project
+
   Environment:
     Type: String
     Default: dev
@@ -20,26 +25,15 @@ Parameters:
     Description: API Gateway endpoint URL
 
 Resources:
-  # CloudFront Origin Access Identity
-  CloudFrontOriginAccessIdentity:
-    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+  # CloudFront Origin Access Control (OAC) - newer and more secure than OAI
+  CloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
     Properties:
-      CloudFrontOriginAccessIdentityConfig:
-        Comment: !Sub ${AWS::StackName} OAI
-
-  # Bucket Policy for CloudFront access
-  WebsiteBucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref WebsiteBucketName
-      PolicyDocument:
-        Statement:
-          - Action:
-              - s3:GetObject
-            Effect: Allow
-            Resource: !Sub arn:aws:s3:::${WebsiteBucketName}/*
-            Principal:
-              CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+      OriginAccessControlConfig:
+        Name: !Sub "${ProjectName}-${Environment}-OAC"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
 
   # CloudFront Distribution
   CloudFrontDistribution:
@@ -47,10 +41,10 @@ Resources:
     Properties:
       DistributionConfig:
         Origins:
-          - DomainName: !Sub "${WebsiteBucketName}.s3.amazonaws.com"
+          - DomainName: !Sub "${WebsiteBucketName}.s3.${AWS::Region}.amazonaws.com"
             Id: S3Origin
-            S3OriginConfig:
-              OriginAccessIdentity: !Sub origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}
+            S3OriginConfig: {}
+            OriginAccessControlId: !GetAtt CloudFrontOriginAccessControl.Id
           - DomainName: !Select [2, !Split ["/", !Ref ApiEndpoint]]
             Id: ApiGateway
             CustomOriginConfig:
@@ -65,13 +59,11 @@ Resources:
             - HEAD
             - OPTIONS
           TargetOriginId: S3Origin
-          ForwardedValues:
-            QueryString: false
-            Cookies:
-              Forward: none
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # CachingOptimized policy
+          OriginRequestPolicyId: 88a5eaf4-2fd4-4709-b370-b4c650ea3fcf  # CORS-S3Origin policy
           ViewerProtocolPolicy: redirect-to-https
         CacheBehaviors:
-          - PathPattern: '/dev/ai*'
+          - PathPattern: '*/ai*'
             AllowedMethods:
               - HEAD
               - DELETE
@@ -81,24 +73,31 @@ Resources:
               - PUT
               - PATCH
             TargetOriginId: ApiGateway
-            ForwardedValues:
-              QueryString: true
-              Headers:
-                - 'Authorization'
-                - 'Content-Type'
-              Cookies:
-                Forward: none
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # CachingDisabled policy
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac  # AllViewerExceptHostHeader policy
             ViewerProtocolPolicy: https-only
         PriceClass: PriceClass_100
         ViewerCertificate:
           CloudFrontDefaultCertificate: true
+        HttpVersion: http2
+        IPV6Enabled: true
       Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-distribution"
         - Key: Environment
           Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
 Outputs:
   WebsiteUrl:
     Description: "CloudFront distribution URL for the website"
     Value: !GetAtt CloudFrontDistribution.DomainName
     Export:
-      Name: !Sub "${AWS::StackName}-WebsiteUrl"
+      Name: !Sub "${ProjectName}-${Environment}-WebsiteUrl"
+      
+  DistributionId:
+    Description: "CloudFront distribution ID"
+    Value: !Ref CloudFrontDistribution
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-DistributionId"

@@ -2,6 +2,11 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: Compute resources for AI Demo
 
 Parameters:
+  ProjectName:
+    Type: String
+    Default: AiDemo
+    Description: Name of the project
+
   Environment:
     Type: String
     Default: dev
@@ -113,7 +118,7 @@ Resources:
               
               return response
       Description: AI Lambda handler for request response.
-      FunctionName: !Sub ${AWS::StackName}-AIHandler
+      FunctionName: !Sub "${ProjectName}-${Environment}-AIHandler"
       Handler: index.lambda_handler
       MemorySize: 256
       Role: !GetAtt LambdaRole.Arn
@@ -127,11 +132,14 @@ Resources:
         Variables:
           ENVIRONMENT: !Ref Environment
           MODEL_ID: !Ref ModelId
+          PROJECT_NAME: !Ref ProjectName
       Tags:
         - Key: Name
-          Value: !Sub ${AWS::StackName}-lambda
+          Value: !Sub "${ProjectName}-${Environment}-lambda"
         - Key: Environment
           Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
   # IAM Role for the Lambda Function
   LambdaRole:
@@ -169,9 +177,11 @@ Resources:
       # Remove explicit role name to avoid conflicts in GitHub Actions deployments
       Tags:
         - Key: Name
-          Value: !Sub ${AWS::StackName}-lambda-role
+          Value: !Sub "${ProjectName}-${Environment}-lambda-role"
         - Key: Environment
           Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
   LambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -186,9 +196,11 @@ Resources:
           Description: Allow HTTPS outbound traffic
       Tags:
         - Key: Name
-          Value: !Sub ${AWS::StackName}-lambda-sg
+          Value: !Sub "${ProjectName}-${Environment}-lambda-sg"
         - Key: Environment
           Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
   # CloudWatch Log Group for Lambda with proper retention
   LambdaLogGroup:
@@ -199,6 +211,8 @@ Resources:
       Tags:
         - Key: Environment
           Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
 
 Conditions:
   IsProd: !Equals [!Ref Environment, "prod"]
@@ -208,4 +222,4 @@ Outputs:
     Description: "ARN of the Lambda function"
     Value: !GetAtt AIFunction.Arn
     Export:
-      Name: !Sub "${AWS::StackName}-LambdaFunctionArn"
+      Name: !Sub "${ProjectName}-${Environment}-LambdaFunctionArn"

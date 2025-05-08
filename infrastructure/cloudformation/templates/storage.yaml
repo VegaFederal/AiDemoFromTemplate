@@ -2,6 +2,11 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: Storage resources for AI Demo
 
 Parameters:
+  ProjectName:
+    Type: String
+    Default: AiDemo
+    Description: Name of the project
+
   Environment:
     Type: String
     Default: dev
@@ -23,21 +28,45 @@ Resources:
               SSEAlgorithm: AES256
       VersioningConfiguration:
         Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
       Tags:
         - Key: Name
-          Value: !Sub ${AWS::StackName}-website-bucket
+          Value: !Sub "${ProjectName}-${Environment}-website-bucket"
         - Key: Environment
           Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # Bucket policy for CloudFront access
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: 's3:GetObject'
+            Resource: !Sub "${WebsiteBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/*"
 
 Outputs:
   WebsiteBucketName:
     Description: "Name of the S3 bucket for website files"
     Value: !Ref WebsiteBucket
     Export:
-      Name: !Sub "${AWS::StackName}-WebsiteBucketName"
+      Name: !Sub "${ProjectName}-${Environment}-WebsiteBucketName"
   
   WebsiteBucketArn:
     Description: "ARN of the S3 bucket for website files"
     Value: !GetAtt WebsiteBucket.Arn
     Export:
-      Name: !Sub "${AWS::StackName}-WebsiteBucketArn"
+      Name: !Sub "${ProjectName}-${Environment}-WebsiteBucketArn"
