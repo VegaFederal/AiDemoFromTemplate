@@ -11,6 +11,7 @@ env:
   SUBNET_IDS: subnet-077c4af68ae8a1869  # Updated from project-config.json
   AWS_REGION: us-east-1
   STACK_NAME: AiDemo
+  TEMPLATE_BUCKET: your-template-bucket-name  # Replace with your bucket name
 
 jobs:
   test:
@@ -37,12 +38,32 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION || 'us-east-1'}}
       
+      # Create or ensure the template bucket exists
+      - name: Ensure template bucket exists
+        run: |
+          aws s3api head-bucket --bucket ${{ env.TEMPLATE_BUCKET }} 2>/dev/null || aws s3 mb s3://${{ env.TEMPLATE_BUCKET }}
+      
+      # Upload nested stack templates to S3
+      - name: Upload nested stack templates
+        run: |
+          aws s3 sync infrastructure/cloudformation/templates/ s3://${{ env.TEMPLATE_BUCKET }}/templates/
+      
+      # Update template URLs in main.yaml
+      - name: Update template URLs
+        run: |
+          sed -i "s|https://your-s3-bucket.s3.amazonaws.com|https://${{ env.TEMPLATE_BUCKET }}.s3.amazonaws.com|g" infrastructure/cloudformation/main.yaml
+      
+      # Fix WebsiteBucket reference in main.yaml
+      - name: Fix WebsiteBucket reference
+        run: |
+          sed -i "s|Value: !Ref WebsiteBucket|Value: !GetAtt StorageStack.Outputs.WebsiteBucketName|g" infrastructure/cloudformation/main.yaml
+      
       # Deploy the CloudFormation stack
       - name: Deploy CloudFormation stack
         uses: aws-actions/aws-cloudformation-github-deploy@v1
         with:
           name: ${{ env.STACK_NAME }}
-          template: infrastructure/cloudformation/template.yaml
+          template: infrastructure/cloudformation/main.yaml
           parameter-overrides: >-
             Environment=dev,
             VpcId=${{ env.VPC_ID }},
@@ -54,10 +75,7 @@ jobs:
       - name: Get S3 bucket name
         id: get-bucket
         run: |
-          BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query "Stacks[0].Outputs[?OutputKey=='WebsiteBucketName'].OutputValue" --output text || echo "")
-          if [ -z "$BUCKET_NAME" ]; then
-            BUCKET_NAME=$(aws cloudformation describe-stack-resources --stack-name ${{ env.STACK_NAME }} --logical-resource-id WebsiteBucket --query "StackResources[0].PhysicalResourceId" --output text)
-          fi
+          BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query "Stacks[0].Outputs[?OutputKey=='WebsiteBucketName'].OutputValue" --output text)
           echo "BUCKET_NAME=$BUCKET_NAME" >> $GITHUB_ENV
           echo "Bucket name: $BUCKET_NAME"
       
