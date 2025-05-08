@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Main stack for AI Demo
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - test
+      - prod
+    Description: The deployment environment
+  
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Default: vpc-0956ba067263f706b
+    Description: ID of the existing company VPC
+  
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Default: subnet-00f677a7f7cdea980
+    Description: List of existing subnet IDs for deployment
+
+Resources:
+  StorageStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://your-s3-bucket.s3.amazonaws.com/templates/storage.yaml
+      Parameters:
+        Environment: !Ref Environment
+      TimeoutInMinutes: 30
+
+  ComputeStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: StorageStack
+    Properties:
+      TemplateURL: https://your-s3-bucket.s3.amazonaws.com/templates/compute.yaml
+      Parameters:
+        Environment: !Ref Environment
+        VpcId: !Ref VpcId
+        SubnetIds: !Join [",", !Ref SubnetIds]
+        WebsiteBucketName: !GetAtt StorageStack.Outputs.WebsiteBucketName
+      TimeoutInMinutes: 30
+
+  ApiStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: ComputeStack
+    Properties:
+      TemplateURL: https://your-s3-bucket.s3.amazonaws.com/templates/api.yaml
+      Parameters:
+        Environment: !Ref Environment
+        LambdaFunctionArn: !GetAtt ComputeStack.Outputs.LambdaFunctionArn
+      TimeoutInMinutes: 30
+
+  CdnStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: [StorageStack, ApiStack]
+    Properties:
+      TemplateURL: https://your-s3-bucket.s3.amazonaws.com/templates/cdn.yaml
+      Parameters:
+        Environment: !Ref Environment
+        WebsiteBucketName: !GetAtt StorageStack.Outputs.WebsiteBucketName
+        ApiEndpoint: !GetAtt ApiStack.Outputs.ApiEndpoint
+      TimeoutInMinutes: 30
+
+Outputs:
+  ApiEndpoint:
+    Description: "API Gateway endpoint URL for the AI function"
+    Value: !GetAtt ApiStack.Outputs.ApiEndpoint
+  WebsiteUrl:
+    Description: "CloudFront distribution URL for the website"
+    Value: !GetAtt CdnStack.Outputs.WebsiteUrl
+  WebsiteBucketName:
+    Description: "Name of the S3 bucket for website files"
+    Value: !Ref WebsiteBucket

@@ -1,0 +1,202 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Compute resources for AI Demo
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - test
+      - prod
+    Description: The deployment environment
+  
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: ID of the existing company VPC
+  
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: List of existing subnet IDs for deployment
+  
+  WebsiteBucketName:
+    Type: String
+    Description: Name of the S3 bucket for website files
+
+Resources:
+  # Lambda Function for the API
+  AIFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import logging
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def lambda_handler(event, context):
+              logger.info(f"Event: {json.dumps(event)}")
+              logger.info(f"Context: {str(context)}")
+              
+              try:
+                  # Parse the incoming request
+                  if 'body' not in event or not event['body']:
+                      raise ValueError("Missing or empty request body")
+                  body = json.loads(event['body'])
+                  prompt = body.get('prompt')
+                  if not prompt:
+                      raise ValueError("Missing 'prompt' in request body")
+                  
+                  # Initialize Bedrock client
+                  bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
+                  
+                  # Configure the request
+                  messages = [{"role": "user", "content": [{"text": prompt}]}]
+
+                  request_body = {
+                      "schemaVersion": "messages-v1",
+                      "messages": messages
+                  }
+                  
+                  # Call Bedrock with the prompt in messages format
+                  response = bedrock.invoke_model(
+                      modelId='amazon.nova-pro-v1:0',
+                      body=json.dumps(request_body)
+                  )
+                  
+                  # Parse the response
+                  response_body = json.loads(response['body'].read())
+                  logger.info(f"Response: {json.dumps(response_body)}")
+                  
+                  # Extract the generated text
+                  generated_text = response_body.get('output', {}).get('message', {}).get('content', [{}])[0].get('text', 'No response text')
+                  
+                  # Return the response
+                  return {
+                      'statusCode': 200,
+                      'headers': {
+                          'Access-Control-Allow-Origin': '*',
+                          'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                          'Access-Control-Allow-Methods': 'OPTIONS,POST',
+                          'Content-Type': 'application/json'
+                      },
+                      'body': json.dumps({'response': generated_text})
+                  }
+              except Exception as e:
+                  logger.error(f"Error: {str(e)}", exc_info=True)
+                  return {
+                      'statusCode': 500,
+                      'headers': {
+                          'Access-Control-Allow-Origin': '*',
+                          'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                          'Access-Control-Allow-Methods': 'OPTIONS,POST',
+                          'Content-Type': 'application/json'
+                      },
+                      'body': json.dumps({'error': str(e)})
+                  }
+      Description: AI Lambda handler for request response.
+      FunctionName: !Sub ${AWS::StackName}-AIHandler
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt LambdaRole.Arn
+      Runtime: python3.9
+      Timeout: 300
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroup
+        SubnetIds: !Ref SubnetIds
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-lambda
+        - Key: Environment
+          Value: !Ref Environment
+
+  # IAM Role for the Lambda Function
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+        - PolicyName: LambdaVPCPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:CreateNetworkInterface
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DeleteNetworkInterface
+                  - ec2:AssignPrivateIpAddresses
+                  - ec2:UnassignPrivateIpAddresses
+                Resource: '*'
+        - PolicyName: LambdaBedrockPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModelWithResponseStream
+                  - bedrock:InvokeModel
+                Resource: 
+                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.nova-pro-v1:0"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}::879961718230:inference-profile/us.amazon.nova-pro-v1:0"
+        - PolicyName: LambdaS3Policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: !Sub "arn:aws:s3:::${WebsiteBucketName}/*"
+
+      RoleName: !Sub ${AWS::StackName}-lambda-role
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-lambda-role
+        - Key: Environment
+          Value: !Ref Environment
+
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Lambda function
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-lambda-sg
+        - Key: Environment
+          Value: !Ref Environment
+
+Outputs:
+  LambdaFunctionArn:
+    Description: "ARN of the Lambda function"
+    Value: !GetAtt AIFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaFunctionArn"

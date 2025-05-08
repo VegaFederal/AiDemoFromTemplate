@@ -1,0 +1,87 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: API resources for AI Demo
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - test
+      - prod
+    Description: The deployment environment
+  
+  LambdaFunctionArn:
+    Type: String
+    Description: ARN of the Lambda function
+
+Resources:
+  # API Gateway REST API
+  Api:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub ${AWS::StackName}-ai-api
+      Description: API Gateway for AI Lambda function.
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-ai-api
+        - Key: Environment
+          Value: !Ref Environment
+
+  # API Gateway Resource (endpoint path)
+  ApiResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref Api
+      ParentId: !GetAtt Api.RootResourceId
+      PathPart: 'ai'
+    
+  # API Gateway Method (HTTP method)
+  ApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref Api
+      ResourceId: !Ref ApiResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunctionArn}/invocations
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: 'Empty'
+
+  # API Gateway Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: ApiMethod
+    Properties:
+      RestApiId: !Ref Api
+      StageName: !Ref Environment
+      
+  # Lambda Permission for API Gateway
+  LambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LambdaFunctionArn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/${Environment}/POST/ai
+
+Outputs:
+  ApiEndpoint:
+    Description: "API Gateway endpoint URL for the AI function"
+    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/ai"
+    Export:
+      Name: !Sub "${AWS::StackName}-ApiEndpoint"
+  
+  ApiId:
+    Description: "ID of the API Gateway REST API"
+    Value: !Ref Api
+    Export:
+      Name: !Sub "${AWS::StackName}-ApiId"

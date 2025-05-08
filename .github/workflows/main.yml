@@ -29,7 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      # Updated to use the latest version of the AWS credentials action
+      # Configure AWS credentials
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -37,95 +37,8 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION || 'us-east-1'}}
       
-      # Step 1: Create S3-only template
-      - name: Create S3-only template
-        run: |
-          mkdir -p .github/deployment
-          cat > .github/deployment/s3-only-template.yaml << 'EOF'
-          AWSTemplateFormatVersion: '2010-09-09'
-          Description: S3 bucket for AI Demo
-
-          Parameters:
-            Environment:
-              Type: String
-              Default: dev
-              AllowedValues:
-                - dev
-                - test
-                - prod
-              Description: The deployment environment
-
-          Resources:
-            # S3 Bucket for all static website files Creation.
-            WebsiteBucket:
-              Type: AWS::S3::Bucket
-              Properties:
-                AccessControl: Private
-                BucketEncryption:
-                  ServerSideEncryptionConfiguration:
-                    - ServerSideEncryptionByDefault:
-                        SSEAlgorithm: AES256
-                VersioningConfiguration:
-                  Status: Enabled
-                Tags:
-                  - Key: Name
-                    Value: !Sub ${AWS::StackName}-website-bucket
-                  - Key: Environment
-                    Value: !Ref Environment
-
-          Outputs:
-            WebsiteBucketName:
-              Description: "Name of the S3 bucket for website files"
-              Value: !Ref WebsiteBucket
-          EOF
-
-      # Step 2: Create Lambda deployment package
-      - name: Create Lambda deployment package
-        run: |
-          mkdir -p deployment/lambda
-          cp src/lambda/lambdaAiHandler.py deployment/lambda/
-          cd deployment/lambda
-          zip -r ../lambdaAiHandler.zip .
-          cd ../..
-          
-          # List the contents of the ZIP file to verify
-          unzip -l deployment/lambdaAiHandler.zip
-
-      # Step 3: Deploy S3 bucket first
-      - name: Deploy S3 bucket first
-        id: deploy-bucket
-        uses: aws-actions/aws-cloudformation-github-deploy@v1
-        with:
-          name: ${{ env.STACK_NAME }}-s3
-          template: .github/deployment/s3-only-template.yaml
-          parameter-overrides: >-
-            Environment=dev
-          no-fail-on-empty-changeset: "1"
-
-      # Step 4: Get the S3 bucket name from CloudFormation outputs
-      - name: Get S3 bucket name
-        id: get-bucket
-        run: |
-          BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }}-s3 --query "Stacks[0].Outputs[?OutputKey=='WebsiteBucketName'].OutputValue" --output text)
-          echo "BUCKET_NAME=$BUCKET_NAME" >> $GITHUB_ENV
-          echo "Bucket name: $BUCKET_NAME"
-
-      # Step 5: Upload Lambda code to S3 bucket
-      - name: Upload Lambda code to S3
-        run: |
-          aws s3 cp deployment/lambdaAiHandler.zip s3://$BUCKET_NAME/lambda/
-          aws s3 cp src/lambda/lambdaAiHandler.py s3://$BUCKET_NAME/lambda/
-          
-          # Verify the upload
-          aws s3 ls s3://$BUCKET_NAME/lambda/
-
-      # Step 6: Update Lambda code reference in template
-      - name: Update Lambda code reference in template
-        run: |
-          sed -i 's/S3Key: lambda\/lambdaAiHandler.py/S3Key: lambda\/lambdaAiHandler.zip/' infrastructure/cloudformation/template.yaml
-
-      # Step 7: Deploy the full CloudFormation stack
-      - name: Deploy full stack
+      # Deploy the CloudFormation stack
+      - name: Deploy CloudFormation stack
         uses: aws-actions/aws-cloudformation-github-deploy@v1
         with:
           name: ${{ env.STACK_NAME }}
@@ -136,17 +49,31 @@ jobs:
             SubnetIds=${{ env.SUBNET_IDS }}
           no-fail-on-empty-changeset: "1"
           capabilities: "CAPABILITY_NAMED_IAM"
-
-      # Step 8: Upload existing website files to S3 bucket
+      
+      # Get the S3 bucket name from CloudFormation outputs
+      - name: Get S3 bucket name
+        id: get-bucket
+        run: |
+          BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query "Stacks[0].Outputs[?OutputKey=='WebsiteBucketName'].OutputValue" --output text || echo "")
+          if [ -z "$BUCKET_NAME" ]; then
+            BUCKET_NAME=$(aws cloudformation describe-stack-resources --stack-name ${{ env.STACK_NAME }} --logical-resource-id WebsiteBucket --query "StackResources[0].PhysicalResourceId" --output text)
+          fi
+          echo "BUCKET_NAME=$BUCKET_NAME" >> $GITHUB_ENV
+          echo "Bucket name: $BUCKET_NAME"
+      
+      # Upload website files to S3 bucket
       - name: Upload website files to S3
         run: |
           if [ -d "website" ]; then
             aws s3 sync website/ s3://$BUCKET_NAME/
           else
-            echo "No website directory found. Skipping website upload."
+            echo "No website directory found. Creating a simple index.html"
+            mkdir -p website
+            echo "<html><body><h1>AI Demo</h1><p>Welcome to the AI Demo!</p></body></html>" > website/index.html
+            aws s3 sync website/ s3://$BUCKET_NAME/
           fi
-
-      # Step 9: Get CloudFront URL
+      
+      # Get CloudFront URL
       - name: Get CloudFront URL
         run: |
           CF_URL=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query "Stacks[0].Outputs[?OutputKey=='WebsiteUrl'].OutputValue" --output text)

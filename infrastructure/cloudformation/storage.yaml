@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: S3 bucket for AI Demo
+Description: Storage resources for AI Demo
 
 Parameters:
   Environment:
@@ -33,3 +33,11 @@ Outputs:
   WebsiteBucketName:
     Description: "Name of the S3 bucket for website files"
     Value: !Ref WebsiteBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-WebsiteBucketName"
+  
+  WebsiteBucketArn:
+    Description: "ARN of the S3 bucket for website files"
+    Value: !GetAtt WebsiteBucket.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-WebsiteBucketArn"
