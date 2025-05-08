@@ -69,7 +69,7 @@ async function generateResponse() {
     responseDiv.textContent = 'Generating response...';
 
     try {
-        const response = await fetch('/ai', {
+        const response = await fetch('/dev/ai', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
