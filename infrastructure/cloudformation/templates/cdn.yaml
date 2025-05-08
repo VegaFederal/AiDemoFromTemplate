@@ -71,7 +71,7 @@ Resources:
               Forward: none
           ViewerProtocolPolicy: redirect-to-https
         CacheBehaviors:
-          - PathPattern: '/ai*'
+          - PathPattern: '/dev/ai*'
             AllowedMethods:
               - HEAD
               - DELETE
