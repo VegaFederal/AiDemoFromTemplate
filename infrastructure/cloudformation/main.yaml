@@ -62,7 +62,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DependsOn: ComputeStack
     Properties:
-      TemplateURL: https://${TemplateBucket}.s3.amazonaws.com/templates/api.yaml
+      TemplateURL: !Sub https://${TemplateBucket}.s3.amazonaws.com/templates/api.yaml
       Parameters:
         Environment: !Ref Environment
         LambdaFunctionArn: !GetAtt ComputeStack.Outputs.LambdaFunctionArn
@@ -72,7 +72,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DependsOn: [StorageStack, ApiStack]
     Properties:
-      TemplateURL: https://${TemplateBucket}.s3.amazonaws.com/templates/cdn.yaml
+      TemplateURL: !Sub https://${TemplateBucket}.s3.amazonaws.com/templates/cdn.yaml
       Parameters:
         Environment: !Ref Environment
         WebsiteBucketName: !GetAtt StorageStack.Outputs.WebsiteBucketName
