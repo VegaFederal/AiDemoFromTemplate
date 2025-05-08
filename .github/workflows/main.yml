@@ -104,4 +104,50 @@ jobs:
 
       # Step 4: Get the S3 bucket name from CloudFormation outputs
       - name: Get S3 bucket name
-        id: get
+        id: get-bucket
+        run: |
+          BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }}-s3 --query "Stacks[0].Outputs[?OutputKey=='WebsiteBucketName'].OutputValue" --output text)
+          echo "BUCKET_NAME=$BUCKET_NAME" >> $GITHUB_ENV
+          echo "Bucket name: $BUCKET_NAME"
+
+      # Step 5: Upload Lambda code to S3 bucket
+      - name: Upload Lambda code to S3
+        run: |
+          aws s3 cp deployment/lambdaAiHandler.zip s3://$BUCKET_NAME/lambda/
+          aws s3 cp src/lambda/lambdaAiHandler.py s3://$BUCKET_NAME/lambda/
+          
+          # Verify the upload
+          aws s3 ls s3://$BUCKET_NAME/lambda/
+
+      # Step 6: Update Lambda code reference in template
+      - name: Update Lambda code reference in template
+        run: |
+          sed -i 's/S3Key: lambda\/lambdaAiHandler.py/S3Key: lambda\/lambdaAiHandler.zip/' infrastructure/cloudformation/template.yaml
+
+      # Step 7: Deploy the full CloudFormation stack
+      - name: Deploy full stack
+        uses: aws-actions/aws-cloudformation-github-deploy@v1
+        with:
+          name: ${{ env.STACK_NAME }}
+          template: infrastructure/cloudformation/template.yaml
+          parameter-overrides: >-
+            Environment=dev,
+            VpcId=${{ env.VPC_ID }},
+            SubnetIds=${{ env.SUBNET_IDS }}
+          no-fail-on-empty-changeset: "1"
+          capabilities: "CAPABILITY_NAMED_IAM"
+
+      # Step 8: Upload existing website files to S3 bucket
+      - name: Upload website files to S3
+        run: |
+          if [ -d "website" ]; then
+            aws s3 sync website/ s3://$BUCKET_NAME/
+          else
+            echo "No website directory found. Skipping website upload."
+          fi
+
+      # Step 9: Get CloudFront URL
+      - name: Get CloudFront URL
+        run: |
+          CF_URL=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query "Stacks[0].Outputs[?OutputKey=='WebsiteUrl'].OutputValue" --output text)
+          echo "Your website is available at: https://$CF_URL"
