@@ -69,7 +69,11 @@ async function generateResponse() {
     responseDiv.textContent = 'Generating response...';
 
     try {
-        const response = await fetch('/dev/ai', {
+        // Get the current URL to determine the API endpoint
+        const currentUrl = window.location.href;
+        const apiUrl = currentUrl.includes('/dev/') ? '/dev/ai' : '/ai';
+
+        const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -88,7 +92,7 @@ async function generateResponse() {
 
     } catch (error) {
         console.error('Error:', error);
-        responseDiv.textContent = 'An error occurred while generating the response.';
+        responseDiv.textContent = 'An error occurred while generating the response: ' + error.message;
     } finally {
         // Remove loading state
         form.classList.remove('loading');
@@ -96,6 +100,13 @@ async function generateResponse() {
     }
 }
 
+// Add event listener for Enter key in textarea
+document.getElementById('userInput').addEventListener('keydown', function(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        generateResponse();
+    }
+});
     </script>
 </body>
 </html>
