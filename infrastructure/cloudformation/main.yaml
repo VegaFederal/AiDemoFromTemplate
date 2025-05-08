@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Main stack for AI Demo
+Description: Main stack for AI Demo from template
 
 Parameters:
   ProjectName:
