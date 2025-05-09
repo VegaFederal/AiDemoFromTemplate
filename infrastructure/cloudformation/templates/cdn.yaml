@@ -37,6 +37,7 @@ Resources:
               OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOAI}"
           - DomainName: !Select [2, !Split ["/", !Ref ApiEndpoint]]
             Id: ApiGateway
+            OriginPath: !Sub "/${Environment}"
             CustomOriginConfig:
               HTTPPort: 80
               HTTPSPort: 443
@@ -56,7 +57,7 @@ Resources:
               Forward: none
           ViewerProtocolPolicy: redirect-to-https
         CacheBehaviors:
-          - PathPattern: '/dev/ai*'
+          - PathPattern: '/ai'
             AllowedMethods:
               - HEAD
               - DELETE

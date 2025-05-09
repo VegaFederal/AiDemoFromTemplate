@@ -55,9 +55,16 @@ Resources:
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
-          - Effect: Allow
+          - Sid: "1"
+            Effect: Allow
             Principal:
               AWS: !Sub "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOAI}"
+            Action: 's3:GetObject'
+            Resource: !Sub "${WebsiteBucket.Arn}/*"
+          - Sid: "2"
+            Effect: Allow
+            Principal:
+              AWS: "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity E3RQKSV0B3QFSU"
             Action: 's3:GetObject'
             Resource: !Sub "${WebsiteBucket.Arn}/*"
 

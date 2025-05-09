@@ -71,7 +71,7 @@ async function generateResponse() {
     try {
         // Get the current URL to determine the API endpoint
         const currentUrl = window.location.href;
-        const apiUrl = currentUrl.includes('/dev/') ? '/dev/ai' : '/ai';
+        const apiUrl = '/ai';
 
         const response = await fetch(apiUrl, {
             method: 'POST',
