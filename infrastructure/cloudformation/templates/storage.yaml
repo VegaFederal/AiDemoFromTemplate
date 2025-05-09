@@ -47,34 +47,6 @@ Resources:
         - Key: Project
           Value: !Ref ProjectName
 
-  # CloudFront Origin Identity (OAI)
-  CloudFrontOAI:
-    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
-    Properties:
-      CloudFrontOriginAccessIdentityConfig:
-        Comment: !Sub "${ProjectName}-${Environment}-OAI"
-
-  # Bucket policy for CloudFront access using OAI
-  WebsiteBucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref WebsiteBucket
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Sid: "1"
-            Effect: Allow
-            Principal:
-              CanonicalUser: !GetAtt CloudFrontOAI.S3CanonicalUserId
-            Action: 's3:GetObject'
-            Resource: !Sub "${WebsiteBucket.Arn}/*"
-          - Sid: "2"
-            Effect: Allow
-            Principal:
-              CanonicalUser: "a5a9c93abf90afd9a2b02c5c5c7c4167b22deaf5"
-            Action: 's3:GetObject'
-            Resource: !Sub "${WebsiteBucket.Arn}/*"
-
 Outputs:
   WebsiteBucketName:
     Description: "Name of the S3 bucket for website files"
@@ -87,9 +59,3 @@ Outputs:
     Value: !GetAtt WebsiteBucket.Arn
     Export:
       Name: !Sub "${ProjectName}-${Environment}-WebsiteBucketArn"
-    
-  CloudFrontOAI:
-    Description: "CloudFront Origin Access Identity"
-    Value: !Ref CloudFrontOAI
-    Export:
-      Name: !Sub "${ProjectName}-${Environment}-CloudFrontOAI"

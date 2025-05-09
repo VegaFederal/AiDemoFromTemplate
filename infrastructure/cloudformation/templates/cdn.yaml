@@ -25,6 +25,27 @@ Parameters:
     Description: API Gateway endpoint URL
 
 Resources:
+  # CloudFront Origin Access Identity
+  CloudFrontOAI:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub "${ProjectName}-${Environment}-OAI"
+
+  # Bucket policy for CloudFront access using OAI
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucketName
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              CanonicalUser: !GetAtt CloudFrontOAI.S3CanonicalUserId
+            Action: 's3:GetObject'
+            Resource: !Sub "arn:aws:s3:::${WebsiteBucketName}/*"
+
   # CloudFront Distribution
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
@@ -95,13 +116,6 @@ Resources:
         - Key: Project
           Value: !Ref ProjectName
 
-  # CloudFront Origin Access Identity
-  CloudFrontOAI:
-    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
-    Properties:
-      CloudFrontOriginAccessIdentityConfig:
-        Comment: !Sub "${ProjectName}-${Environment}-OAI"
-
 Outputs:
   WebsiteUrl:
     Description: "CloudFront distribution URL for the website"
@@ -114,3 +128,9 @@ Outputs:
     Value: !Ref CloudFrontDistribution
     Export:
       Name: !Sub "${ProjectName}-${Environment}-DistributionId"
+      
+  CloudFrontOAI:
+    Description: "CloudFront Origin Access Identity"
+    Value: !Ref CloudFrontOAI
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-CloudFrontOAI"
