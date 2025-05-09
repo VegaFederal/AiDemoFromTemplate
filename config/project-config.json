@@ -4,8 +4,8 @@
   "infraType": "cloudformation",
   "applicationType": "serverless",
   "awsRegion": "us-east-1",
-  "vpcId": "vpc-05beac377794a8bd0",
-  "subnetIds": "subnet-077c4af68ae8a1869",
+  "vpcId": "vpc-03de7ad5a4c7c1822",
+  "subnetIds": "subnet-005d1ad197eb59c2b",
   "aiModel": "amazon.nova-pro-v1:0",
   "githubRepo": "https://github.com/VegaFederal/AiDemoFromTemplate.git",
   "createdAt": "2025-05-06T20:07:31Z"
