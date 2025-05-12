@@ -194,26 +194,27 @@ Resources:
               - sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
-Policies:
-  - PolicyName: LambdaBedrockPolicy
-    PolicyDocument:
-      Version: '2012-10-17'
-      Statement:
-        - Effect: Allow
-          Action:
-            - bedrock:InvokeModel
-          Resource: 
-            - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${ModelId}"
-            - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*"
-            - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-*"
-  - PolicyName: LambdaS3Policy
-    PolicyDocument:
-      Version: '2012-10-17'
-      Statement:
-        - Effect: Allow
-          Action:
-            - s3:GetObject
-          Resource: !Sub "arn:aws:s3:::${WebsiteBucketName}/*"
+      Policies:
+        - PolicyName: LambdaBedrockPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource: 
+                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${ModelId}"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-*"
+
+        - PolicyName: LambdaS3Policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: !Sub "arn:aws:s3:::${WebsiteBucketName}/*"
       Tags:
         - Key: Name
           Value: !Sub "${ProjectName}-${Environment}-lambda-role"
