@@ -44,6 +44,7 @@ Resources:
           import boto3
           import logging
           import os
+          import re
 
           # Configure logging
           logger = logging.getLogger()
@@ -57,29 +58,61 @@ Resources:
                   return create_response(200)
               
               try:
+                  # Check if this is a CloudFormation custom resource request
+                  if 'RequestType' in event and 'PhysicalResourceId' in event:
+                      logger.info("Handling CloudFormation custom resource request")
+                      return {
+                          'Status': 'SUCCESS',
+                          'PhysicalResourceId': event.get('PhysicalResourceId'),
+                          'StackId': event.get('StackId'),
+                          'RequestId': event.get('RequestId'),
+                          'LogicalResourceId': event.get('LogicalResourceId')
+                      }
+                  
                   # Parse the incoming request
                   if 'body' not in event or not event['body']:
                       raise ValueError("Missing or empty request body")
-                  body = json.loads(event['body'])
+                  
+                  # Handle both string and JSON body
+                  body = event['body']
+                  if isinstance(body, str):
+                      try:
+                          body = json.loads(body)
+                      except json.JSONDecodeError:
+                          raise ValueError("Invalid JSON in request body")
+                  
                   prompt = body.get('prompt')
                   if not prompt:
                       raise ValueError("Missing 'prompt' in request body")
                   
                   # Get model ID from environment variable or use default
                   model_id = os.environ.get('MODEL_ID', 'amazon.nova-pro-v1:0')
+                  logger.info(f"Using model: {model_id}")
                   
                   # Initialize Bedrock client using the current region
                   region = os.environ.get('AWS_REGION')
                   bedrock = boto3.client('bedrock-runtime', region_name=region)
                   
-                  # Configure the request
-                  messages = [{"role": "user", "content": [{"text": prompt}]}]
-                  request_body = {
-                      "schemaVersion": "messages-v1",
-                      "messages": messages
-                  }
+                  # Configure the request based on model type
+                  if re.match(r'anthropic\.claude', model_id):
+                      # Claude models use anthropic message format
+                      request_body = {
+                          "anthropic_version": "bedrock-2023-05-31",
+                          "max_tokens": 1000,
+                          "messages": [
+                              {"role": "user", "content": prompt}
+                          ]
+                      }
+                  else:
+                      # Default to Nova format
+                      messages = [{"role": "user", "content": [{"text": prompt}]}]
+                      request_body = {
+                          "schemaVersion": "messages-v1",
+                          "messages": messages
+                      }
                   
-                  # Call Bedrock with the prompt in messages format
+                  # Call Bedrock with the prompt
+                  logger.info(f"Sending request to Bedrock: {json.dumps(request_body)}")
                   response = bedrock.invoke_model(
                       modelId=model_id,
                       body=json.dumps(request_body)
@@ -87,10 +120,15 @@ Resources:
                   
                   # Parse the response
                   response_body = json.loads(response['body'].read())
-                  logger.info(f"Response received from Bedrock")
+                  logger.info(f"Response received from Bedrock: {json.dumps(response_body)}")
                   
-                  # Extract the generated text
-                  generated_text = response_body.get('output', {}).get('message', {}).get('content', [{}])[0].get('text', 'No response text')
+                  # Extract the generated text based on model type
+                  if re.match(r'anthropic\.claude', model_id):
+                      # Claude response format
+                      generated_text = response_body.get('content', [{}])[0].get('text', 'No response text')
+                  else:
+                      # Nova response format
+                      generated_text = response_body.get('output', {}).get('message', {}).get('content', [{}])[0].get('text', 'No response text')
                   
                   # Return the response
                   return create_response(200, {'response': generated_text})
@@ -99,7 +137,7 @@ Resources:
                   return create_response(400, {'error': str(e)})
               except Exception as e:
                   logger.error(f"Error: {str(e)}", exc_info=True)
-                  return create_response(500, {'error': 'Internal server error'})
+                  return create_response(500, {'error': f'Internal server error: {str(e)}'})
 
           def create_response(status_code, body=None):
               """Create a standardized API Gateway response"""
