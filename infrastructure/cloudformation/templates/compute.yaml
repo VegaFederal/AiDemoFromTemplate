@@ -100,7 +100,7 @@ Resources:
                           "anthropic_version": "bedrock-2023-05-31",
                           "max_tokens": 1000,
                           "messages": [
-                              {"role": "user", "content": prompt}
+                              {"role": "user", "content": [{"type": "text", "text": prompt}]}
                           ]
                       }
                   else:
@@ -125,7 +125,13 @@ Resources:
                   # Extract the generated text based on model type
                   if re.match(r'anthropic\.claude', model_id):
                       # Claude response format
-                      generated_text = response_body.get('content', [{}])[0].get('text', 'No response text')
+                      content_items = response_body.get('content', [])
+                      generated_text = ""
+                      for item in content_items:
+                          if item.get('type') == 'text':
+                              generated_text += item.get('text', '')
+                      if not generated_text:
+                          generated_text = "No response text"
                   else:
                       # Nova response format
                       generated_text = response_body.get('output', {}).get('message', {}).get('content', [{}])[0].get('text', 'No response text')
