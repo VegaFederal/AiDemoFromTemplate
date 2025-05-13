@@ -40,11 +40,11 @@ Resources:
     Properties:
       Code:
         ZipFile: |
-          import json \n
-          import boto3 \n
-          import logging \n
-          import os \n
-          import re \n
+          import json
+          import boto3
+          import logging
+          import os
+          import re
 
           # Configure logging
           logger = logging.getLogger()
@@ -193,7 +193,7 @@ Resources:
                   }
       Description: AI Lambda handler for request response.
       FunctionName: !Sub "${ProjectName}-${Environment}-AIHandler"
-      Handler: index.lambda_handler
+      Handler: lambda_function.lambda_handler
       MemorySize: 256
       Role: !GetAtt LambdaRole.Arn
       Runtime: python3.11
