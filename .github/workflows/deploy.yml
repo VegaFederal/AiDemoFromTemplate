@@ -60,7 +60,16 @@ jobs:
         
       - name: Upload templates to S3
         run: aws s3 sync infrastructure/cloudformation/templates/ s3://$TEMPLATE_BUCKET/templates/
-      
+      - name: Create Lambda deployment package
+        run: |
+          mkdir -p deployment/lambda
+          cat > deployment/lambda/lambda_function.py << 'EOL'
+          # Your Python code here
+          EOL
+          cd deployment/lambda
+          zip -r lambda_function.zip lambda_function.py
+          aws s3 mb s3://${PROJECT_NAME}-${ENVIRONMENT}-deployment || true
+          aws s3 cp lambda_function.zip s3://${PROJECT_NAME}-${ENVIRONMENT}-deployment/
       - name: Deploy CloudFormation stack
         uses: aws-actions/aws-cloudformation-github-deploy@v1
         with:
