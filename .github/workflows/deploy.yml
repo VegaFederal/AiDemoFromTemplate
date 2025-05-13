@@ -75,6 +75,7 @@ jobs:
           template: infrastructure/cloudformation/main.yaml
           parameter-overrides: >-
             ProjectName=${{ env.PROJECT_NAME }},
+            projectNameLower = ${{ env.PROJECT_NAME_LOWER }}
             Environment=dev,
             VpcId=${{ env.VPC_ID }},
             SubnetIds=${{ env.SUBNET_IDS }},
