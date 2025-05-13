@@ -64,8 +64,8 @@ jobs:
         run: |
           cd src/lambda
           zip -r lambdaAiHandler.zip lambdaAiHandler.py
-          aws s3 mb s3://${{ env.PROJECT_NAME }}-dev-deployment || true
-          aws s3 cp lambdaAiHandler.zip s3://${{ env.PROJECT_NAME }}-dev-deployment/
+          aws s3 mb s3://${{ env.PROJECT_NAME_LOWER }}-dev-deployment || true
+          aws s3 cp lambdaAiHandler.zip s3://${{ env.PROJECT_NAME_LOWER }}-dev-deployment/
 
       - name: Deploy CloudFormation stack
         uses: aws-actions/aws-cloudformation-github-deploy@v1
