@@ -40,11 +40,11 @@ Resources:
     Properties:
       Code:
         ZipFile: |
-          import json
-          import boto3
-          import logging
-          import os
-          import re
+          import json \n
+          import boto3 \n
+          import logging \n
+          import os \n
+          import re \n
 
           # Configure logging
           logger = logging.getLogger()
