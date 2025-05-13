@@ -6,11 +6,11 @@ Parameters:
     Type: String
     Default: AiDemo
     Description: Name of the project
+
   ProjectNameLower:
     Type: String
     Default: aidemo
     Description: Name of the project in lower case.
-
 
   Environment:
     Type: String
