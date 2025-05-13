@@ -7,11 +7,6 @@ Parameters:
     Default: AiDemo
     Description: Name of the project
 
-  ProjectNameLower:
-    Type: String
-    Default: aidemo
-    Description: Name of the project in lower case.
-
   Environment:
     Type: String
     Default: dev
@@ -44,7 +39,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       Code:
-        S3Bucket: !Sub "${ProjectNameLower}-${Environment}-deployment"
+        S3Bucket: !Sub "aidemo-${Environment}-deployment"
         S3Key: lambdaAiHandler.zip
       Description: AI Lambda handler for request response.
       FunctionName: !Sub "${ProjectName}-${Environment}-AIHandler"

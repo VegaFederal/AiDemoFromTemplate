@@ -7,11 +7,6 @@ Parameters:
     Default: AiDemo
     Description: Name of the project
 
-  ProjectNameLower:
-    Type: String
-    Default: aidemo
-    Description: Name of the project lower case.
-
   Environment:
     Type: String
     Default: dev
@@ -56,7 +51,6 @@ Resources:
       Parameters:
         Environment: !Ref Environment
         ProjectName: !Ref ProjectName
-        ProjectNameLower: !Ref ProjectNameLower
         VpcId: !Ref VpcId
         SubnetIds: !Join [",", !Ref SubnetIds]
         WebsiteBucketName: !GetAtt StorageStack.Outputs.WebsiteBucketName
