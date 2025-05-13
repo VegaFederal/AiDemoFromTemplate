@@ -34,7 +34,7 @@ Parameters:
     Description: Amazon Bedrock model ID to use
 
 Resources:
-  # Lambda Function for the API
+  # Lambda Function definition for the API
   AIFunction:
     Type: AWS::Lambda::Function
     Properties:
