@@ -83,7 +83,7 @@ def lambda_handler(event, context):
         bedrock = boto3.client('bedrock-runtime', region_name=region)
         
         # Configure the request based on model type
-        if re.match(r'anthropic\.claude', model_id):
+        if re.match(r'arn:', model_id):
             # Claude models use anthropic message format
             request_body = {
                 "anthropic_version": "bedrock-2023-05-31",
@@ -112,7 +112,7 @@ def lambda_handler(event, context):
         logger.info("Response received from Bedrock")
         
         # Extract the generated text based on model type
-        if re.match(r'anthropic\.claude', model_id):
+        if re.match(r'arn:', model_id):
             # Claude response format
             content_items = response_body.get('content', [])
             generated_text = ""
