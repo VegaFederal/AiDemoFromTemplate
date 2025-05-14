@@ -80,11 +80,12 @@ def lambda_handler(event, context):
         
         # Initialize Bedrock client using the current region
         region = os.environ.get('AWS_REGION')
+        logger.info(f"Using region: {region}")
         bedrock = boto3.client('bedrock-runtime', region_name=region)
         
         # Configure the request based on model type
         if re.match(r'arn:', model_id):
-            # Claude models use anthropic message format what
+            # Claude models use anthropic message format
             request_body = {
                 "anthropic_version": "bedrock-2023-05-31",
                 "max_tokens": 1000,
