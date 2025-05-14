@@ -84,7 +84,7 @@ def lambda_handler(event, context):
         
         # Configure the request based on model type
         if re.match(r'arn:', model_id):
-            # Claude models use anthropic message format
+            # Claude models use anthropic message format what
             request_body = {
                 "anthropic_version": "bedrock-2023-05-31",
                 "max_tokens": 1000,
