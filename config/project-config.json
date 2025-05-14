@@ -6,7 +6,7 @@
   "awsRegion": "us-east-1",
   "vpcId": "vpc-03de7ad5a4c7c1822",
   "subnetIds": "subnet-005d1ad197eb59c2b",
-  "aiModel": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+  "aiModel": "arn:aws:bedrock:us-east-1:879961718230:inference-profile/us.anthropic.claude-3-5-sonnet-20241022-v2:0",
   "githubRepo": "https://github.com/VegaFederal/AiDemoFromTemplate.git",
   "createdAt": "2025-05-06T20:07:31Z"
 }

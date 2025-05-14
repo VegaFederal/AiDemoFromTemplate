@@ -101,7 +101,7 @@ def lambda_handler(event, context):
             }
         
         # Call Bedrock with the prompt
-        logger.info("Sending request to Bedrock, model = {1}", model_id)
+        logger.info(f"Sending request to Bedrock, model = {model_id}")
         response = bedrock.invoke_model(
             modelId=model_id,
             body=json.dumps(request_body)
