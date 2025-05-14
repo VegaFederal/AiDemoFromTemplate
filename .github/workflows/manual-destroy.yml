@@ -82,7 +82,17 @@ jobs:
           aws s3 rm s3://${{ env.TEMPLATE_BUCKET }} --recursive
         fi
     
-    - name: Delete CloudFormation stacks
+    - name: Delete storage stack first
+      run: |
+        # Check if storage stack exists and delete it first
+        if aws cloudformation describe-stacks --stack-name ${{ env.PROJECT_NAME }}-storage 2>/dev/null; then
+          echo "Deleting storage stack: ${{ env.PROJECT_NAME }}-storage"
+          aws cloudformation delete-stack --stack-name ${{ env.PROJECT_NAME }}-storage
+          echo "Waiting for storage stack deletion..."
+          aws cloudformation wait stack-delete-complete --stack-name ${{ env.PROJECT_NAME }}-storage || true
+        fi
+    
+    - name: Delete remaining CloudFormation stacks
       run: |
         # Delete main stack
         echo "Deleting main stack: ${{ env.PROJECT_NAME }}"
@@ -93,7 +103,7 @@ jobs:
         aws cloudformation wait stack-delete-complete --stack-name ${{ env.PROJECT_NAME }} || true
         
         # Check for any remaining nested stacks
-        NESTED_STACKS=("${{ env.PROJECT_NAME }}-cdn" "${{ env.PROJECT_NAME }}-api" "${{ env.PROJECT_NAME }}-compute" "${{ env.PROJECT_NAME }}-storage")
+        NESTED_STACKS=("${{ env.PROJECT_NAME }}-cdn" "${{ env.PROJECT_NAME }}-api" "${{ env.PROJECT_NAME }}-compute")
         
         for stack in "${NESTED_STACKS[@]}"; do
           if aws cloudformation describe-stacks --stack-name $stack 2>/dev/null; then
